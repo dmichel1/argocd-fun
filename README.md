@@ -63,8 +63,12 @@ and it shapes how the smoke test has to be built:
   `workloads/guestbook/smoke-test.yaml` is an ordinary Job, not a hook. Argo CD's built-in Job
   health is Progressing while it runs and Degraded when it fails, the Application inherits that,
   and the next wave waits.
-- **It runs after the app is up.** `sync-wave: "1"` makes Argo CD apply it only once the wave-0
-  Deployment is Healthy. `Replace=true,Force=true` recreates the immutable Job on every sync.
+- **It is applied together with the Deployment, not in a later wave.** With the Job in `sync-wave: "1"`
+  there is a moment after the Deployment turns Healthy and before the Job exists where the app is
+  Synced and Healthy, and the controller starts the next wave right then (seen here: dev marked
+  Healthy one second before its Job was created). In the same wave the app is Progressing from the
+  first apply; curl retries until the pods answer. `Replace=true,Force=true` recreates the immutable
+  Job on every sync.
 - **Every commit re-runs it.** The ApplicationSet template stamps `${ARGOCD_APP_REVISION_SHORT}`
   onto every resource as an annotation, so any commit makes the app OutOfSync and the Job is
   recreated. Without that, a commit touching only the test would leave the app Synced and the

@@ -5,12 +5,17 @@
 # so a failing hook would not hold the next wave. A plain Job is Progressing while it runs and
 # Degraded when it fails, and the Application inherits that, which is exactly what the controller
 # waits on.
+#
+# It is applied in the same sync wave as the Deployment, also on purpose. In a later wave there is
+# a moment after the Deployment turns Healthy and before the Job exists where the Application is
+# Synced and Healthy, and the controller starts the next wave in that moment (observed here: dev
+# was marked Healthy one second before its Job was created). Applied together, the app is
+# Progressing from the first apply, and curl retries until the pods answer.
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: smoke-test
   annotations:
-    argocd.argoproj.io/sync-wave: "1"                        # runs after the Deployment (wave 0) is Healthy
     argocd.argoproj.io/sync-options: Replace=true,Force=true  # Jobs are immutable: delete and recreate on each sync
 spec:
   backoffLimit: 0
@@ -27,5 +32,6 @@ spec:
           set -eu
           url="http://guestbook-ui/"     # change the path to something that 404s to watch a wave get held
           echo "GET $url"
-          curl -fsS -o /dev/null -w 'HTTP %{http_code}\n' --retry 10 --retry-connrefused --retry-delay 3 "$url"
+          # retry while the Service has no ready endpoints (connection refused); a 404 fails at once
+          curl -fsS -o /dev/null -w 'HTTP %{http_code}\n' --retry 20 --retry-connrefused --retry-delay 3 "$url"
           echo "smoke test passed"
