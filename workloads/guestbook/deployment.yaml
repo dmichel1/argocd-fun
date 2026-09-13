@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: guestbook-ui
-        image: gcr.io/heptio-images/ks-guestbook-demo:0.2
+        image: gcr.io/google-samples/gb-frontend:v5   # same image the upstream guestbook uses today
         ports:
         - containerPort: 80
         readinessProbe:          # Argo CD health follows readiness, so a broken image holds the wave
