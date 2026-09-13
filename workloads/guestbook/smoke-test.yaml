@@ -20,7 +20,7 @@ spec:
         args:
         - |
           set -eu
-          url="http://guestbook-ui/"     # change the path to something that 404s to watch a wave get blocked
+          url="http://guestbook-ui/does-not-exist"     # DEMO: broken on purpose; change the path to something that 404s to watch a wave get blocked
           echo "GET $url"
           curl -fsS -o /dev/null -w 'HTTP %{http_code}\n' --retry 10 --retry-connrefused --retry-delay 3 "$url"
           echo "smoke test passed"
