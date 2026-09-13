@@ -7,6 +7,7 @@ GitOps content for the Argo CD lab in [deploy-infra](../deploy-infra), using the
 bootstrap/root.yaml   the root Application; applied once by hand, points at apps/
 apps/                 one Argo CD Application per file; the root syncs this directory
 appsets/              ApplicationSets; synced onto the hub by apps/appsets.yaml, so also under the root
+workloads/            plain manifests deployed by the sets above (currently guestbook with a smoke test)
 ```
 
 Two patterns compose here. `apps/` is the
@@ -45,6 +46,26 @@ Preview what a set would generate with `argocd appset generate appsets/helm-gues
 Deleting `apps/appsets.yaml` from git cascades all the way down: the root prunes the `appsets`
 Application, its finalizer deletes the ApplicationSets, the sets delete their generated
 Applications, and those Applications' finalizers delete the workloads on the spokes.
+
+## Progressive rollout with a smoke-test gate
+
+`appsets/guestbook-rollout.yaml` rolls `workloads/guestbook` through the spokes in waves using
+`strategy.type: RollingSync`: first every cluster whose Secret has `env=dev`, then `env=prod`.
+A wave only starts when every Application in the previous wave is Healthy with a succeeded sync,
+and `workloads/guestbook/smoke-test.yaml` is a `PostSync` hook Job that curls the Service, so a
+failing smoke test on dev holds prod at the previous revision. The hub must run the
+applicationset controller with progressive syncs enabled (deploy-infra: `VARIANT=progressive`).
+
+Try it:
+
+1. Commit a harmless change to `workloads/guestbook/` (a label, `replicas: 2`) and watch
+   `kubectl -n argocd get appset guestbook-rollout -o yaml` under `status.applicationStatus`:
+   dev goes Pending, Progressing, Healthy; only then does prod leave Waiting.
+2. Change the path in `smoke-test.yaml` to one that 404s and push. Dev's sync fails on the hook,
+   prod never starts, and `argocd app get guestbook-rollout-spoke-b` still shows the old revision.
+   Revert the commit and both recover in order.
+
+Argo CD polls git about every three minutes; `argocd app get <app> --hard-refresh` skips the wait.
 
 ## Conventions
 

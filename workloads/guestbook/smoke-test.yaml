@@ -1,0 +1,26 @@
+# Runs after every sync of this workload. If it fails, the sync operation fails, the Application
+# is not considered Healthy by the RollingSync controller, and the next wave does not start.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: smoke-test
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation   # keep the last run (pass or fail) until the next sync
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 120
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: smoke
+        image: curlimages/curl:8.10.1
+        command: ["sh", "-c"]
+        args:
+        - |
+          set -eu
+          url="http://guestbook-ui/"     # change the path to something that 404s to watch a wave get blocked
+          echo "GET $url"
+          curl -fsS -o /dev/null -w 'HTTP %{http_code}\n' --retry 10 --retry-connrefused --retry-delay 3 "$url"
+          echo "smoke test passed"

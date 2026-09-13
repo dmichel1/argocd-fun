@@ -1,0 +1,44 @@
+# Progressive rollout of workloads/guestbook across the spokes, one env wave at a time.
+# Requires progressive syncs on the applicationset controller (deploy-infra VARIANT=progressive).
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: guestbook-rollout
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+  - clusters:
+      selector:
+        matchExpressions:
+        - {key: role, operator: In, values: [spoke]}
+        - {key: env, operator: Exists}        # a spoke without an env would not fall into any wave
+  strategy:
+    type: RollingSync                         # autosync on the generated apps is disabled; this controller syncs them
+    rollingSync:
+      steps:
+      - matchExpressions:                     # wave 1: every dev cluster at once
+        - {key: env, operator: In, values: [dev]}
+      - matchExpressions:                     # wave 2: prod, only after every wave-1 app is Healthy
+        - {key: env, operator: In, values: [prod]}
+        maxUpdate: 100%                       # with several prod clusters, lower this to roll them one by one
+  template:
+    metadata:
+      name: 'guestbook-rollout-{{.name}}'
+      labels:
+        env: '{{.metadata.labels.env}}'       # copied from the cluster Secret; the steps match on it
+      finalizers:
+      - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/dmichel1/argocd-fun.git
+        targetRevision: main
+        path: workloads/guestbook
+      destination:
+        name: '{{.name}}'
+        namespace: guestbook-rollout
+      syncPolicy:
+        syncOptions:
+        - CreateNamespace=true
