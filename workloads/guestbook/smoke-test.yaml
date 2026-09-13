@@ -30,7 +30,7 @@ spec:
         args:
         - |
           set -eu
-          url="http://guestbook-ui/does-not-exist"     # DEMO: broken on purpose. Change the path to something that 404s to watch a wave get held
+          url="http://guestbook-ui/"     # change the path to something that 404s to watch a wave get held
           echo "GET $url"
           # retry while the Service has no ready endpoints (connection refused); a 404 fails at once
           curl -fsS -o /dev/null -w 'HTTP %{http_code}\n' --retry 20 --retry-connrefused --retry-delay 3 "$url"
