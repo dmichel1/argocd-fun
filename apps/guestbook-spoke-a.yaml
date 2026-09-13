@@ -1,0 +1,23 @@
+# Guestbook on spoke-a. The destination name matches the cluster Secret created by deploy-infra.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: guestbook-spoke-a
+  namespace: argocd
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io   # pruning this Application also removes its workloads
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/argoproj/argocd-example-apps
+    targetRevision: HEAD
+    path: guestbook
+  destination:
+    name: spoke-a
+    namespace: guestbook
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true

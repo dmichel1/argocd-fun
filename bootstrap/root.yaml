@@ -1,0 +1,24 @@
+# The root of the app-of-apps. Apply this once by hand (deploy-infra: `make bootstrap`);
+# from then on Argo CD reconciles everything under apps/ from git.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root
+  namespace: argocd
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io   # deleting root deletes the child Applications
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/dmichel1/argocd-fun.git
+    targetRevision: main
+    path: apps
+    directory:
+      recurse: true
+  destination:
+    server: https://kubernetes.default.svc     # Applications must live on the hub, in the argocd namespace
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true        # a file removed from apps/ removes its Application
+      selfHeal: true     # manual edits to a child Application are reverted
