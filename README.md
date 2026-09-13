@@ -51,19 +51,33 @@ Applications, and those Applications' finalizers delete the workloads on the spo
 
 `appsets/guestbook-rollout.yaml` rolls `workloads/guestbook` through the spokes in waves using
 `strategy.type: RollingSync`: first every cluster whose Secret has `env=dev`, then `env=prod`.
-A wave only starts when every Application in the previous wave is Healthy with a succeeded sync,
-and `workloads/guestbook/smoke-test.yaml` is a `PostSync` hook Job that curls the Service, so a
-failing smoke test on dev holds prod at the previous revision. The hub must run the
-applicationset controller with progressive syncs enabled (deploy-infra: `VARIANT=progressive`).
+The hub must run the applicationset controller with progressive syncs enabled (deploy-infra:
+`VARIANT=progressive`).
+
+A wave completes when every Application in it is **Synced and Healthy**. That is the whole gate,
+and it shapes how the smoke test has to be built:
+
+- **Hooks do not gate.** The controller never looks at the sync operation or its hook results
+  (checked in `applicationset/progressivesync/progressive_sync.go` for v3.5.2 and confirmed on this
+  lab: prod was synced while dev's PostSync hook was still running, and it then failed). So
+  `workloads/guestbook/smoke-test.yaml` is an ordinary Job, not a hook. Argo CD's built-in Job
+  health is Progressing while it runs and Degraded when it fails, the Application inherits that,
+  and the next wave waits.
+- **It runs after the app is up.** `sync-wave: "1"` makes Argo CD apply it only once the wave-0
+  Deployment is Healthy. `Replace=true,Force=true` recreates the immutable Job on every sync.
+- **Every commit re-runs it.** The ApplicationSet template stamps `${ARGOCD_APP_REVISION_SHORT}`
+  onto every resource as an annotation, so any commit makes the app OutOfSync and the Job is
+  recreated. Without that, a commit touching only the test would leave the app Synced and the
+  controller would mark the new revision Healthy without running anything.
 
 Try it:
 
-1. Commit a harmless change to `workloads/guestbook/` (a label, `replicas: 2`) and watch
+1. Commit a harmless change under `workloads/guestbook/` and watch
    `kubectl -n argocd get appset guestbook-rollout -o yaml` under `status.applicationStatus`:
-   dev goes Pending, Progressing, Healthy; only then does prod leave Waiting.
-2. Change the path in `smoke-test.yaml` to one that 404s and push. Dev's sync fails on the hook,
-   prod never starts, and `argocd app get guestbook-rollout-spoke-b` still shows the old revision.
-   Revert the commit and both recover in order.
+   dev goes Pending, Progressing (Job running), Healthy; only then does prod leave Waiting.
+2. Change the path in `smoke-test.yaml` to one that 404s and push. Dev goes Degraded, prod stays
+   Waiting, and `argocd app get guestbook-rollout-spoke-b` still shows the previous revision.
+   Revert and both recover in order.
 
 Argo CD polls git about every three minutes; `argocd app get <app> --hard-refresh` skips the wait.
 

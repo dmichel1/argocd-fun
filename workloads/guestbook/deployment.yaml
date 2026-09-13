@@ -2,8 +2,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: guestbook-ui
-  labels:
-    demo: broken-1        # DEMO: a real resource change so the sync (and the hook) actually runs
 spec:
   replicas: 1
   selector:

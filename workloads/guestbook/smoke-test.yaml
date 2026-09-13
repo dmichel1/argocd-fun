@@ -1,12 +1,17 @@
-# Runs after every sync of this workload. If it fails, the sync operation fails, the Application
-# is not considered Healthy by the RollingSync controller, and the next wave does not start.
+# Smoke test that gates RollingSync waves.
+#
+# It is an ordinary resource, not a PostSync hook, on purpose. The ApplicationSet controller decides
+# a wave is done from the Application's health and sync status alone; it never looks at hook results,
+# so a failing hook would not hold the next wave. A plain Job is Progressing while it runs and
+# Degraded when it fails, and the Application inherits that, which is exactly what the controller
+# waits on.
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: smoke-test
   annotations:
-    argocd.argoproj.io/hook: PostSync
-    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation   # keep the last run (pass or fail) until the next sync
+    argocd.argoproj.io/sync-wave: "1"                        # runs after the Deployment (wave 0) is Healthy
+    argocd.argoproj.io/sync-options: Replace=true,Force=true  # Jobs are immutable: delete and recreate on each sync
 spec:
   backoffLimit: 0
   activeDeadlineSeconds: 120
@@ -20,7 +25,7 @@ spec:
         args:
         - |
           set -eu
-          url="http://guestbook-ui/does-not-exist"     # DEMO: broken on purpose; change the path to something that 404s to watch a wave get blocked
+          url="http://guestbook-ui/"     # change the path to something that 404s to watch a wave get held
           echo "GET $url"
           curl -fsS -o /dev/null -w 'HTTP %{http_code}\n' --retry 10 --retry-connrefused --retry-delay 3 "$url"
           echo "smoke test passed"

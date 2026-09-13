@@ -36,6 +36,12 @@ spec:
         repoURL: https://github.com/dmichel1/argocd-fun.git
         targetRevision: main
         path: workloads/guestbook
+        kustomize:
+          # Stamp the commit onto every resource so any commit makes the app OutOfSync and the
+          # smoke-test Job is recreated and re-run, even when only the Deployment changed.
+          commonAnnotations:
+            argocd-fun/revision: ${ARGOCD_APP_REVISION_SHORT}
+          commonAnnotationsEnvsubst: true
       destination:
         name: '{{.name}}'
         namespace: guestbook-rollout
