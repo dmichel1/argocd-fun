@@ -1,0 +1,23 @@
+# Makes the ApplicationSets under appsets/ part of the app of apps: the root creates this
+# Application, and it syncs the appsets/ directory onto the hub. Editing or adding a set in
+# git is enough; nothing is applied by hand.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: appsets
+  namespace: argocd
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io   # pruning this deletes the sets, which delete their generated apps
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/dmichel1/argocd-fun.git
+    targetRevision: main
+    path: appsets                            # has a kustomization.yaml, so Argo CD renders it with kustomize
+  destination:
+    server: https://kubernetes.default.svc   # ApplicationSets live on the hub, next to the Applications
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

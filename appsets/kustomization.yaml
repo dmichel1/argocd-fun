@@ -1,5 +1,5 @@
-# Lets deploy-infra apply the whole directory remotely:
-#   kubectl apply -k 'https://github.com/dmichel1/argocd-fun//appsets?ref=main'
+# Argo CD detects this file and renders the directory with kustomize. It also lets you apply
+#   the directory by hand: kubectl apply -k appsets/
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:

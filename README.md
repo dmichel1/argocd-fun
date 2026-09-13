@@ -6,14 +6,15 @@ GitOps content for the Argo CD lab in [deploy-infra](../deploy-infra), using the
 ```
 bootstrap/root.yaml   the root Application; applied once by hand, points at apps/
 apps/                 one Argo CD Application per file; the root syncs this directory
-appsets/              ApplicationSets, applied by hand as a kustomization; independent of the root
+appsets/              ApplicationSets; synced onto the hub by apps/appsets.yaml, so also under the root
 ```
 
-Two patterns live side by side on purpose so they can be compared. `apps/` is the
+Two patterns compose here. `apps/` is the
 [app of apps](https://argo-cd.readthedocs.io/en/stable/operator-manual/cluster-bootstrapping/):
-every Application is written by hand. `appsets/` uses
+every Application is written by hand. One of those Applications, `apps/appsets.yaml`, syncs
+`appsets/`, which holds
 [ApplicationSets](https://argo-cd.readthedocs.io/en/stable/operator-manual/applicationset/):
-a template plus a generator stamps the Applications out.
+a template plus a generator stamps further Applications out. Everything descends from the root.
 
 ## How it works
 
@@ -37,10 +38,13 @@ produces `helm-guestbook-<spoke>` for every cluster Secret carrying that label. 
 the label when it registers a spoke. Register a third spoke and a third Application appears with
 no commit here; remove the label and the Application (and its workloads, via the finalizer) go away.
 
-Apply with `make bootstrap-appset` in deploy-infra, which runs
-`kubectl apply -k 'https://github.com/dmichel1/argocd-fun//appsets?ref=main'`. The sets are not
-synced by the root, so after editing them, re-run that target. Preview what a set would generate
-with `argocd appset generate appsets/helm-guestbook.yaml`.
+The sets are synced by the `appsets` Application, which the root creates from `apps/appsets.yaml`.
+To add a set, add a file under `appsets/`, list it in `appsets/kustomization.yaml`, and push.
+Preview what a set would generate with `argocd appset generate appsets/helm-guestbook.yaml`.
+
+Deleting `apps/appsets.yaml` from git cascades all the way down: the root prunes the `appsets`
+Application, its finalizer deletes the ApplicationSets, the sets delete their generated
+Applications, and those Applications' finalizers delete the workloads on the spokes.
 
 ## Conventions
 
