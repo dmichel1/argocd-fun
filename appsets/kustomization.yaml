@@ -1,0 +1,6 @@
+# Lets deploy-infra apply the whole directory remotely:
+#   kubectl apply -k 'https://github.com/dmichel1/argocd-fun//appsets?ref=main'
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- helm-guestbook.yaml

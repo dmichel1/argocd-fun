@@ -6,7 +6,14 @@ GitOps content for the Argo CD lab in [deploy-infra](../deploy-infra), using the
 ```
 bootstrap/root.yaml   the root Application; applied once by hand, points at apps/
 apps/                 one Argo CD Application per file; the root syncs this directory
+appsets/              ApplicationSets, applied by hand as a kustomization; independent of the root
 ```
+
+Two patterns live side by side on purpose so they can be compared. `apps/` is the
+[app of apps](https://argo-cd.readthedocs.io/en/stable/operator-manual/cluster-bootstrapping/):
+every Application is written by hand. `appsets/` uses
+[ApplicationSets](https://argo-cd.readthedocs.io/en/stable/operator-manual/applicationset/):
+a template plus a generator stamps the Applications out.
 
 ## How it works
 
@@ -22,6 +29,18 @@ apps/                 one Argo CD Application per file; the root syncs this dire
 Add `apps/<name>.yaml` containing an `Application` in namespace `argocd`, push to `main`,
 and the root picks it up on its next poll (about three minutes) or immediately after
 `argocd app get root --hard-refresh`. Delete the file to remove the app and its workloads.
+
+## ApplicationSets
+
+`appsets/helm-guestbook.yaml` uses the cluster generator with `matchLabels: role: spoke`, so it
+produces `helm-guestbook-<spoke>` for every cluster Secret carrying that label. deploy-infra sets
+the label when it registers a spoke. Register a third spoke and a third Application appears with
+no commit here; remove the label and the Application (and its workloads, via the finalizer) go away.
+
+Apply with `make bootstrap-appset` in deploy-infra, which runs
+`kubectl apply -k 'https://github.com/dmichel1/argocd-fun//appsets?ref=main'`. The sets are not
+synced by the root, so after editing them, re-run that target. Preview what a set would generate
+with `argocd appset generate appsets/helm-guestbook.yaml`.
 
 ## Conventions
 

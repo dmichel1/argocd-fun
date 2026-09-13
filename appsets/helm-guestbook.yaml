@@ -1,0 +1,38 @@
+# One helm-guestbook Application per spoke, generated from the hub's cluster Secrets.
+# The cluster generator selects Secrets labelled role=spoke (set by deploy-infra's
+# scripts/spoke-register.sh); registering a new spoke is enough for its app to appear.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: helm-guestbook
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+  - clusters:
+      selector:
+        matchLabels:
+          role: spoke
+  template:
+    metadata:
+      name: 'helm-guestbook-{{.name}}'
+      finalizers:
+      - resources-finalizer.argocd.argoproj.io   # pruning a generated Application removes its workloads
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/argoproj/argocd-example-apps
+        targetRevision: HEAD
+        path: helm-guestbook
+      destination:
+        name: '{{.name}}'
+        namespace: helm-guestbook
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+        - CreateNamespace=true
+  syncPolicy:
+    preserveResourcesOnDeletion: false   # deleting the set deletes the generated Applications too
