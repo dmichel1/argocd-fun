@@ -1,0 +1,10 @@
+# Argo Rollouts on a spoke, installed through OLM by the argo-rollouts-manager operator.
+# Prerequisites on the cluster (deploy-infra): OLM installed, and the operator/bundle/catalog images in
+# the local registry at localhost:5001 (make olm, make rollouts-manager-image).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- catalogsource.yaml
+- subscription.yaml
+- namespace.yaml
+- rolloutmanager.yaml

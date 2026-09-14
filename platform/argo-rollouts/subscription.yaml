@@ -1,0 +1,21 @@
+# The operator only supports the AllNamespaces install mode, so it goes into `operators`, where OLM's
+# default global OperatorGroup lives. The two env vars are what allows a cluster-scoped Rollouts
+# instance, and name the one namespace allowed to host it.
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: argo-rollouts-manager
+  namespace: operators
+spec:
+  channel: alpha
+  name: argo-rollouts-manager
+  source: argo-rollouts-manager-catalog
+  sourceNamespace: olm
+  installPlanApproval: Automatic
+  startingCSV: argo-rollouts-manager.v0.0.9
+  config:
+    env:
+    - name: NAMESPACE_SCOPED_ARGO_ROLLOUTS
+      value: "false"
+    - name: CLUSTER_SCOPED_ARGO_ROLLOUTS_NAMESPACES
+      value: argo-rollouts

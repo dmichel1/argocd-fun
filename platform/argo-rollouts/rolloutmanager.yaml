@@ -1,0 +1,14 @@
+# One cluster-scoped Argo Rollouts instance per cluster (the operator allows at most one, and none
+# namespace-scoped alongside it). Its CRD only exists once the operator is installed, hence the later
+# sync wave and SkipDryRunOnMissingResource; Argo CD waits for the Subscription (wave 0) to be
+# Healthy (AtLatestKnown) before applying this.
+apiVersion: argoproj.io/v1alpha1
+kind: RolloutManager
+metadata:
+  name: argo-rollouts
+  namespace: argo-rollouts
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  namespaceScoped: false

@@ -1,0 +1,39 @@
+# Argo Rollouts (via OLM + argo-rollouts-manager) on every spoke. Platform component, so it is
+# generated per cluster like the workloads, and synced by the root through apps/appsets.yaml.
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: platform-argo-rollouts
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+  - clusters:
+      selector:
+        matchLabels:
+          role: spoke
+  template:
+    metadata:
+      name: 'platform-argo-rollouts-{{.name}}'
+      finalizers:
+      - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/dmichel1/argocd-fun.git
+        targetRevision: main
+        path: platform/argo-rollouts
+      destination:
+        name: '{{.name}}'
+        namespace: argo-rollouts
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:                       # the operator, and with it the RolloutManager CRD, takes a minute to arrive
+          limit: 10
+          backoff:
+            duration: 15s
+            factor: 2
+            maxDuration: 3m
