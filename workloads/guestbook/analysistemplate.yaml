@@ -1,0 +1,33 @@
+# Smoke test as an Argo Rollouts analysis. The Job provider creates a Kubernetes Job from this spec in
+# the Rollout's namespace; the metric passes if the Job exits 0 and fails otherwise. Referenced by the
+# Rollout's prePromotionAnalysis, so it runs against the preview Service before traffic switches.
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: smoke-test
+spec:
+  args:
+  - name: url
+  metrics:
+  - name: smoke
+    provider:
+      job:
+        metadata:
+          labels:
+            app: guestbook-smoke
+        spec:
+          backoffLimit: 0
+          activeDeadlineSeconds: 120
+          template:
+            spec:
+              restartPolicy: Never
+              containers:
+              - name: smoke
+                image: curlimages/curl:8.10.1
+                command: ["sh", "-c"]
+                args:
+                - |
+                  set -eu
+                  echo "GET {{args.url}}"
+                  curl -fsS -o /dev/null -w 'HTTP %{http_code}\n' --retry 20 --retry-connrefused --retry-delay 3 "{{args.url}}"
+                  echo "smoke test passed"

@@ -46,5 +46,11 @@ spec:
         name: '{{.name}}'
         namespace: guestbook-rollout
       syncPolicy:
+        # RollingSync disables autosync on the generated apps, but it reads the prune flag from here
+        # first (progressive_sync.go): without automated.prune the old resources are never pruned,
+        # the app never reaches Synced, and the wave never completes.
+        automated:
+          prune: true
+          selfHeal: true
         syncOptions:
         - CreateNamespace=true

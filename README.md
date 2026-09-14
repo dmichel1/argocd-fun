@@ -7,7 +7,8 @@ GitOps content for the Argo CD lab in [deploy-infra](../deploy-infra), using the
 bootstrap/root.yaml   the root Application; applied once by hand, points at apps/
 apps/                 one Argo CD Application per file; the root syncs this directory
 appsets/              ApplicationSets; synced onto the hub by apps/appsets.yaml, so also under the root
-workloads/            plain manifests deployed by the sets above (currently guestbook with a smoke test)
+platform/             cluster components deployed to every spoke (Argo Rollouts via OLM)
+workloads/            what runs on the spokes (guestbook as a blue-green Rollout with a smoke test)
 ```
 
 Two patterns compose here. `apps/` is the
@@ -47,41 +48,54 @@ Deleting `apps/appsets.yaml` from git cascades all the way down: the root prunes
 Application, its finalizer deletes the ApplicationSets, the sets delete their generated
 Applications, and those Applications' finalizers delete the workloads on the spokes.
 
+## Platform: Argo Rollouts on every spoke, via OLM
+
+`platform/argo-rollouts/` installs Argo Rollouts with the
+[argo-rollouts-manager](https://github.com/argoproj-labs/argo-rollouts-manager) operator through
+Operator Lifecycle Manager: a CatalogSource for the locally built catalog, a Subscription in
+`operators` whose `config.env` permits a cluster-scoped instance and names its namespace, and one
+cluster-scoped `RolloutManager` in `argo-rollouts` (sync wave 2, `SkipDryRunOnMissingResource`,
+because its CRD arrives with the operator). `appsets/platform-argo-rollouts.yaml` generates one
+Application per `role=spoke` cluster. deploy-infra provides the prerequisites: the local registry,
+OLM on each spoke, and the operator, bundle and catalog images, which upstream does not publish.
+
+`operator-rbac-fix.yaml` works around an upstream gap: the operator's CSV lacks three rules that the
+Rollouts v1.9.0 ClusterRole it creates contains, and Kubernetes' escalation check rejects the grant.
+
 ## Progressive rollout with a smoke-test gate
 
 `appsets/guestbook-rollout.yaml` rolls `workloads/guestbook` through the spokes in waves using
 `strategy.type: RollingSync`: first every cluster whose Secret has `env=dev`, then `env=prod`.
 The hub must run the applicationset controller with progressive syncs enabled (deploy-infra:
-`VARIANT=progressive`).
+`VARIANT=progressive`). A wave completes when every Application in it is **Synced and Healthy**;
+that is the whole gate, and the workload is built so the smoke test feeds into it:
 
-A wave completes when every Application in it is **Synced and Healthy**. That is the whole gate,
-and it shapes how the smoke test has to be built:
+- The guestbook is a **blue-green Argo Rollout**. New pods come up behind `guestbook-ui-preview`,
+  the `smoke-test` AnalysisTemplate runs a Job (the `job` provider) against that preview Service as
+  `prePromotionAnalysis`, and only on success does the active Service switch. On failure the Rollout
+  aborts by itself: the preview ReplicaSet is scaled down and the previous version keeps serving.
+- Argo CD's built-in Rollout health is Progressing during analysis, Degraded on abort, Healthy once
+  promoted. The Application inherits it, so dev's smoke test holds prod with no extra plumbing.
+- The ApplicationSet template stamps `${ARGOCD_APP_REVISION_SHORT}` onto every resource, pod
+  template included, so every commit starts a rollout and therefore a smoke test.
+- The template keeps `syncPolicy.automated.prune: true` even though RollingSync disables autosync:
+  the controller reads the prune flag from there before disabling it.
 
-- **Hooks do not gate.** The controller never looks at the sync operation or its hook results
-  (checked in `applicationset/progressivesync/progressive_sync.go` for v3.5.2 and confirmed on this
-  lab: prod was synced while dev's PostSync hook was still running, and it then failed). So
-  `workloads/guestbook/smoke-test.yaml` is an ordinary Job, not a hook. Argo CD's built-in Job
-  health is Progressing while it runs and Degraded when it fails, the Application inherits that,
-  and the next wave waits.
-- **It is applied together with the Deployment, not in a later wave.** With the Job in `sync-wave: "1"`
-  there is a moment after the Deployment turns Healthy and before the Job exists where the app is
-  Synced and Healthy, and the controller starts the next wave right then (seen here: dev marked
-  Healthy one second before its Job was created). In the same wave the app is Progressing from the
-  first apply; curl retries until the pods answer. `Replace=true,Force=true` recreates the immutable
-  Job on every sync.
-- **Every commit re-runs it.** The ApplicationSet template stamps `${ARGOCD_APP_REVISION_SHORT}`
-  onto every resource as an annotation, so any commit makes the app OutOfSync and the Job is
-  recreated. Without that, a commit touching only the test would leave the app Synced and the
-  controller would mark the new revision Healthy without running anything.
+Why not a hook? The RollingSync controller (`applicationset/progressivesync/progressive_sync.go`)
+never looks at sync operations or hook results, so a `PostSync` smoke test did not hold prod in
+this lab, and a plain Job needed same-wave and Replace/Force tricks to work. The Rollout's own health
+is the clean signal. Set `autoPromotionEnabled: false` for a manual gate: the Rollout pauses,
+Argo CD reports Suspended, and the wave waits until someone runs `kubectl argo rollouts promote`.
 
 Try it:
 
 1. Commit a harmless change under `workloads/guestbook/` and watch
-   `kubectl -n argocd get appset guestbook-rollout -o yaml` under `status.applicationStatus`:
-   dev goes Pending, Progressing (Job running), Healthy; only then does prod leave Waiting.
-2. Change the path in `smoke-test.yaml` to one that 404s and push. Dev goes Degraded, prod stays
-   Waiting, and `argocd app get guestbook-rollout-spoke-b` still shows the previous revision.
-   Revert and both recover in order.
+   `kubectl -n argocd get appset guestbook-rollout -o yaml` under `status.applicationStatus`, or
+   `kubectl argo rollouts get rollout guestbook-ui -n guestbook-rollout --context kind-spoke-a -w`:
+   dev goes Pending, Progressing (analysis running), Healthy; only then does prod leave Waiting.
+2. Change the analysis URL path in `rollout.yaml` to one that 404s and push. Dev's Rollout aborts
+   and goes Degraded, prod stays Waiting, and `argocd app get guestbook-rollout-spoke-b` still shows
+   the previous revision. Revert and both recover in order.
 
 Argo CD polls git about every three minutes; `argocd app get <app> --hard-refresh` skips the wait.
 

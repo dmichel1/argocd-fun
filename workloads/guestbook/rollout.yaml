@@ -1,0 +1,47 @@
+# The guestbook as an Argo Rollouts blue-green Rollout instead of a Deployment.
+#
+# New pods come up behind guestbook-ui-preview; the smoke-test AnalysisTemplate runs a Job against
+# that preview Service; only if it passes does the active Service switch over (autoPromotionEnabled).
+# If it fails the Rollout aborts on its own: the preview ReplicaSet is scaled down and the active
+# Service never moved, so the previous version keeps serving.
+#
+# Argo CD's built-in Rollout health is Progressing during analysis, Degraded on abort and Healthy
+# once promoted. The RollingSync ApplicationSet waits on exactly that, so a failed smoke test on dev
+# holds prod with no extra plumbing: no same-wave Job, no Replace/Force.
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: guestbook-ui
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: guestbook-ui
+  template:
+    metadata:
+      labels:
+        app: guestbook-ui
+    spec:
+      containers:
+      - name: guestbook-ui
+        image: gcr.io/google-samples/gb-frontend:v5
+        ports:
+        - containerPort: 80
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          periodSeconds: 5
+  strategy:
+    blueGreen:
+      activeService: guestbook-ui
+      previewService: guestbook-ui-preview
+      autoPromotionEnabled: true       # set to false for a manual gate: the Rollout pauses (Argo CD: Suspended) until promoted
+      scaleDownDelaySeconds: 30
+      prePromotionAnalysis:
+        templates:
+        - templateName: smoke-test
+        args:
+        - name: url
+          value: http://guestbook-ui-preview/     # change the path to something that 404s to watch a wave get held

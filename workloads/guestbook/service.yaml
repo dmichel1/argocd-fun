@@ -1,7 +1,21 @@
+# Active service: what users hit. Argo Rollouts adds a rollouts-pod-template-hash selector to pin it
+# to the stable ReplicaSet; that added key is not drift to Argo CD.
 apiVersion: v1
 kind: Service
 metadata:
   name: guestbook-ui
+spec:
+  selector:
+    app: guestbook-ui
+  ports:
+  - port: 80
+    targetPort: 80
+---
+# Preview service: points at the new ReplicaSet during a rollout; the smoke test targets it.
+apiVersion: v1
+kind: Service
+metadata:
+  name: guestbook-ui-preview
 spec:
   selector:
     app: guestbook-ui
