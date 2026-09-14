@@ -100,7 +100,11 @@ Try it:
 2. Change the analysis URL path in `rollout.yaml` to one that 404s, bump the pod-template annotation
    so a rollout starts, and push. Dev's Rollout aborts
    and goes Degraded, prod stays Waiting, and `argocd app get guestbook-rollout-spoke-b` still shows
-   the previous revision. Revert and both recover in order.
+   the previous revision.
+3. Recover with a **new revision**: fix the URL and bump the pod-template annotation together. Fixing
+   only the analysis does not help, because the pod template hash is unchanged and Argo Rollouts keeps
+   that revision aborted even though Argo CD syncs the fix. The imperative alternative is
+   `kubectl argo rollouts retry rollout guestbook-ui -n guestbook-rollout --context kind-spoke-a`.
 
 Argo CD polls git about every three minutes; `argocd app get <app> --hard-refresh` skips the wait.
 

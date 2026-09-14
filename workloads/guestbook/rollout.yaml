@@ -23,7 +23,7 @@ spec:
       labels:
         app: guestbook-ui
       annotations:
-        release: "2"          # bump to start a rollout without changing the image; stands in for a real release
+        release: "3"          # bump to start a rollout without changing the image; stands in for a real release
     spec:
       containers:
       - name: guestbook-ui
