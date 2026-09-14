@@ -59,8 +59,11 @@ because its CRD arrives with the operator). `appsets/platform-argo-rollouts.yaml
 Application per `role=spoke` cluster. deploy-infra provides the prerequisites: the local registry,
 OLM on each spoke, and the operator, bundle and catalog images, which upstream does not publish.
 
-`operator-rbac-fix.yaml` works around an upstream gap: the operator's CSV lacks three rules that the
-Rollouts v1.9.0 ClusterRole it creates contains, and Kubernetes' escalation check rejects the grant.
+The operator image is built from a fork branch that fixes an upstream gap: the operator's own RBAC
+lacked three rules that the Rollouts v1.9.0 ClusterRole it creates contains, so Kubernetes' escalation
+check rejected the grant. The fix and a regression test were proposed upstream
+(argoproj-labs/argo-rollouts-manager); until a release carries it, deploy-infra builds the branch as
+`0.0.10-rbacfix.1`. Earlier this directory carried a ClusterRole workaround instead.
 
 ## Progressive rollout with a smoke-test gate
 

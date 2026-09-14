@@ -6,6 +6,5 @@ kind: Kustomization
 resources:
 - catalogsource.yaml
 - subscription.yaml
-- operator-rbac-fix.yaml
 - namespace.yaml
 - rolloutmanager.yaml

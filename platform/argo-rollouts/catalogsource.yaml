@@ -1,5 +1,7 @@
 # The catalog is built from source by deploy-infra (scripts/rollouts-manager-build.sh); nothing is
 # published upstream. localhost:5001 resolves to the kind-registry container on every node.
+# 0.0.10-rbacfix.1 is the operator built from the fork branch carrying the RBAC fix proposed
+# upstream (see the argocd-fun README); the catalog also holds v0.0.9 so OLM upgrades from it.
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
@@ -7,6 +9,6 @@ metadata:
   namespace: olm
 spec:
   sourceType: grpc
-  image: localhost:5001/argo-rollouts-manager-catalog:v0.0.9
+  image: localhost:5001/argo-rollouts-manager-catalog:v0.0.10-rbacfix.1
   displayName: Argo Rollouts Manager (local build)
   publisher: deploy-infra
