@@ -76,8 +76,11 @@ that is the whole gate, and the workload is built so the smoke test feeds into i
   aborts by itself: the preview ReplicaSet is scaled down and the previous version keeps serving.
 - Argo CD's built-in Rollout health is Progressing during analysis, Degraded on abort, Healthy once
   promoted. The Application inherits it, so dev's smoke test holds prod with no extra plumbing.
-- The ApplicationSet template stamps `${ARGOCD_APP_REVISION_SHORT}` onto every resource, pod
-  template included, so every commit starts a rollout and therefore a smoke test.
+- The ApplicationSet template stamps `${ARGOCD_APP_REVISION_SHORT}` onto every resource, so every
+  commit makes the apps OutOfSync and walks the waves. The stamp does not reach the Rollout's pod
+  template (kustomize only knows that path for built-in kinds), so a rollout, and with it the smoke
+  test, happens when the pod template itself changes, as in a real release. Commits that change
+  nothing in the pods pass through the waves with the Rollout still Healthy.
 - The template keeps `syncPolicy.automated.prune: true` even though RollingSync disables autosync:
   the controller reads the prune flag from there before disabling it.
 
@@ -89,11 +92,13 @@ Argo CD reports Suspended, and the wave waits until someone runs `kubectl argo r
 
 Try it:
 
-1. Commit a harmless change under `workloads/guestbook/` and watch
+1. Commit a pod-template change under `workloads/guestbook/` (an annotation on the pod template is
+   enough) and watch
    `kubectl -n argocd get appset guestbook-rollout -o yaml` under `status.applicationStatus`, or
    `kubectl argo rollouts get rollout guestbook-ui -n guestbook-rollout --context kind-spoke-a -w`:
    dev goes Pending, Progressing (analysis running), Healthy; only then does prod leave Waiting.
-2. Change the analysis URL path in `rollout.yaml` to one that 404s and push. Dev's Rollout aborts
+2. Change the analysis URL path in `rollout.yaml` to one that 404s, bump the pod-template annotation
+   so a rollout starts, and push. Dev's Rollout aborts
    and goes Degraded, prod stays Waiting, and `argocd app get guestbook-rollout-spoke-b` still shows
    the previous revision. Revert and both recover in order.
 
