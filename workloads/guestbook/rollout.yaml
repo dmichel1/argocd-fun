@@ -1,4 +1,4 @@
-# The guestbook as an Argo Rollouts blue-green Rollout instead of a Deployment.
+# The guestbook as an Argo Rollouts blue-green Rollout instead of a Deployment. (demo: harmless change)
 #
 # New pods come up behind guestbook-ui-preview; the smoke-test AnalysisTemplate runs a Job against
 # that preview Service; only if it passes does the active Service switch over (autoPromotionEnabled).
