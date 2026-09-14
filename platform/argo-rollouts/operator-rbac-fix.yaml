@@ -1,0 +1,37 @@
+# Workaround for argo-rollouts-manager v0.0.9 on vanilla Kubernetes.
+#
+# The operator creates the Rollouts controller's ClusterRole, and Kubernetes' RBAC escalation check
+# only lets it grant rules it holds itself. Its CSV is missing three rules that the Argo Rollouts v1.9.0
+# ClusterRole contains, so reconciliation fails with:
+#   clusterroles "argo-rollouts" is forbidden: ... attempting to grant RBAC permissions not currently held:
+#   {""/deployments update,patch} {""/podtemplates update,patch} {traefik.io/traefikservices watch,get,update}
+# Granting exactly those rules to the operator's service account lets the grant through. Remove once
+# the operator's bundle carries them.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: argo-rollouts-manager-escalation-fix
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+rules:
+- apiGroups: [""]
+  resources: ["deployments", "podtemplates"]
+  verbs: ["update", "patch"]
+- apiGroups: ["traefik.io"]
+  resources: ["traefikservices"]
+  verbs: ["watch", "get", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: argo-rollouts-manager-escalation-fix
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: argo-rollouts-manager-escalation-fix
+subjects:
+- kind: ServiceAccount
+  name: argo-rollouts-manager-controller-manager   # created by OLM from the CSV
+  namespace: operators
