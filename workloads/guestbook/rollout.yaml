@@ -23,7 +23,7 @@ spec:
       labels:
         app: guestbook-ui
       annotations:
-        release: "1"          # bump to start a rollout without changing the image; stands in for a real release
+        release: "2"          # bump to start a rollout without changing the image; stands in for a real release
     spec:
       containers:
       - name: guestbook-ui
@@ -46,4 +46,4 @@ spec:
         - templateName: smoke-test
         args:
         - name: url
-          value: http://guestbook-ui-preview/     # change the path to something that 404s to watch a wave get held
+          value: http://guestbook-ui-preview/does-not-exist     # DEMO: broken on purpose. Change the path to something that 404s to watch a wave get held
