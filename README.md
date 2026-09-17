@@ -27,6 +27,10 @@ a template plus a generator stamps further Applications out. Everything descends
    that Argo CD creates, updates, or prunes to match git.
 4. Each child Application deploys a workload to a destination cluster by name.
 
+`apps/ack-eks-controller.yaml` installs the ACK EKS controller 1.17.0 on the hub from its OCI Helm
+chart; Argo CD renders the chart (there is no Helm release object), and the hub's Argo CD knows the
+registry as an OCI Helm repository.
+
 ## Adding an app
 
 Add `apps/<name>.yaml` containing an `Application` in namespace `argocd`, push to `main`,

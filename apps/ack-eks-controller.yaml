@@ -1,0 +1,31 @@
+# AWS Controllers for Kubernetes: the EKS service controller, on the hub, from its official OCI Helm
+# chart. Argo CD renders the chart; the hub's Argo CD has the registry registered as an OCI Helm
+# repository (deploy-infra argocd/values/base.yaml). Without AWS credentials the controller idles.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ack-eks-controller
+  namespace: argocd
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: public.ecr.aws/aws-controllers-k8s
+    chart: eks-chart
+    targetRevision: 1.17.0
+    helm:
+      releaseName: ack-eks-controller
+      valuesObject:
+        aws:
+          region: us-east-1
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ack-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true        # the CRDs are large; avoids the last-applied annotation size limit
