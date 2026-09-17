@@ -20,6 +20,7 @@ spec:
       valuesObject:
         aws:
           region: us-east-1
+          test: 'abc'
   destination:
     server: https://kubernetes.default.svc
     namespace: ack-system
