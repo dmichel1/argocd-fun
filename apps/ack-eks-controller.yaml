@@ -14,7 +14,7 @@ spec:
   source:
     repoURL: public.ecr.aws/aws-controllers-k8s
     chart: eks-chart
-    targetRevision: 1.17.0
+    targetRevision: 1.23.0
     helm:
       releaseName: ack-eks-controller
       valuesObject:
