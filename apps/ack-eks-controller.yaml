@@ -1,6 +1,7 @@
 # AWS Controllers for Kubernetes: the EKS service controller, on the hub, from its official OCI Helm
 # chart. Argo CD renders the chart; the hub's Argo CD has the registry registered as an OCI Helm
-# repository (deploy-infra argocd/values/base.yaml). Without AWS credentials the controller idles.
+# repository (deploy-infra argocd/values/base.yaml). ACK controllers call STS at startup and exit
+# without AWS credentials, so the pod crash-loops until credentials or a mock endpoint are set.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
